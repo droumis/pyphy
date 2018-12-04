@@ -23,7 +23,7 @@ In the repo directory
 
 ## Download data
 
-[download data demo notebook](code/download_data.ipynb)
+> [download data demo notebook](code/download_data.ipynb)
 
 ## Demo analyses
 
