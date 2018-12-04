@@ -23,9 +23,9 @@ In the repo directory
 ## Download data
 see the download data demo notebook:
 
-hyphy/code/download_data.ipynb
+pyphy/code/download_data.ipynb
 
 ## Demo analyses
 
-place fields: hyphy/code/spatial_rate_maps.ipynb
+place fields: pyphy/code/spatial_rate_maps.ipynb
 
