@@ -16,5 +16,5 @@
     "animals": [
         "JZ1"
     ],
-    "download_dir": "/tmp/hyphy/"
+    "data_dir": "/opt/DR_swapdata10/"
 }
