@@ -1,12 +1,11 @@
-# hyphy
+# pyphy
 
-Hyphy is an on-disk dataset format specification and basic IO tools for python
+pyphy is an analysis framework for physiological data
 
 ## Install
 
-You should clone this repository  
-`git clone https://github.com/droumis/hyphy.git`
-  
+clone this repository  
+`git clone https://github.com/droumis/pyphy.git`
 
 and then install necessary packages.
 
@@ -15,17 +14,18 @@ and then install necessary packages.
 In the repo directory  
 `conda update conda`  
 `conda env create -f environment.yml`  
-`conda activate hyphy`  
+`conda activate pyphy`  
 
 #### b) Install into an existing environment
 
-You will need the following core libraries
-
-`conda install numpy pandas h5py Pillow matplotlib scipy toolz pytables snakeviz dask distributed`
-
+`conda env update -f=environment.yml`
 
 ## Download data
 see the download data demo notebook:
 
-hyphy/code/**download_data.ipynb**
+hyphy/code/download_data.ipynb
+
+## Demo analyses
+
+place fields: hyphy/code/spatial_rate_maps.ipynb
 
