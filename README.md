@@ -3,8 +3,10 @@
 pyphy is a python-based analysis framework for physiological data
 
 ## Install
+`conda update conda`  
+`conda update conda`  
 
-clone this repository  
+clone this repository:  
 `git clone https://github.com/droumis/pyphy.git`
 
 and then install necessary packages.
@@ -12,7 +14,6 @@ and then install necessary packages.
 #### a) Create a conda environment (preferred)
 
 In the repo directory  
-`conda update conda`  
 `conda env create -f environment.yml`  
 `conda activate pyphy`  
 
