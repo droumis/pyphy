@@ -1,6 +1,6 @@
 # pyphy
 
-pyphy is an analysis framework for physiological data
+pyphy is a python-based analysis framework for physiological data
 
 ## Install
 
