@@ -22,11 +22,10 @@ In the repo directory
 `conda env update -f=environment.yml`
 
 ## Download data
-see the download data demo notebook:
 
-pyphy/code/download_data.ipynb
+[download data demo notebook](code/download_data.ipynb)
 
 ## Demo analyses
 
-**firing rate spatial maps**: pyphy/code/spatial_rate_maps.ipynb
+> [firing rate spatial maps](code/spatial_rate_maps.ipynb)
 
