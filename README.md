@@ -28,5 +28,5 @@ pyphy/code/download_data.ipynb
 
 ## Demo analyses
 
-place fields: pyphy/code/spatial_rate_maps.ipynb
+**firing rate spatial maps**: pyphy/code/spatial_rate_maps.ipynb
 
