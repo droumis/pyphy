@@ -1,0 +1,20 @@
+{
+    "JZ1": {
+        "20161114": {
+            "day": 1,
+            "dropbox": "https://www.dropbox.com/s/e1n4a1gzv8pbv5c/"
+        },
+        "20161115": {
+            "day": 2,
+            "dropbox": "https://www.dropbox.com/s/c1an971o4s7al09/"
+        },
+        "day2date": {
+            "1": "20161114",
+            "2": "20161115"
+        }
+    },
+    "animals": [
+        "JZ1"
+    ],
+    "download_dir": "/tmp/hyphy/"
+}

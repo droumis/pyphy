@@ -1,0 +1,31 @@
+name: pyphy
+channels:
+- conda-forge
+- defaults
+- ioam
+- edeno
+dependencies:
+- "python>=3.6"
+- setuptools
+- numpy
+- scipy
+- pandas
+- xarray
+- statsmodels
+- regularized_glm
+- matplotlib
+- seaborn
+- scikit-learn
+- patsy
+- pytest
+- jupyter
+- coveralls
+- pytest-cov
+- numba
+- holoviews
+- bokeh
+- tqdm
+- dask
+- distributed
+- h5py
+- fastparquet
