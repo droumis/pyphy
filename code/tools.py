@@ -47,7 +47,7 @@ def get_data_catalogue(config_path = '../config.json', source='dropbox'):
                 url = config[animal][date][source]
                 available_data[animal].append(config[animal][date]['day'])
             except:
-                pass
+                continue
     return available_data    
 
 def get_animal_from_filepath(file):
@@ -102,17 +102,7 @@ def read_h5_files(datafilter, datatype, config_path):
             paths.sort()
             for path in paths:
                 df = pd.read_hdf(path, f'/{datatype}')
-                if 'ntrode' in df.reset_index().columns.tolist():
-                    # if any ntrode filters can be applied to this df
-                    ntrodes = []
-                    for key,filters in datafilter.items():
-                        if key in ntrodeInfo.reset_index().columns.tolist():
-                            #if the filter key can be applied to ntrodeInfo
-                            for filt in filters:
-                            #for each filter condition
-                                ntrodes.append(ntrodeInfo.reset_index().query(filt).tetrode_number.unique())
-                    ntrodes = list(np.unique(np.concatenate(ntrodes)))
-                    df = df.query('ntrode==@ntrodes')
+                
                 if 'epoch' in df.reset_index().columns.tolist():
                     # if any epoch filters can be applied to this df
                     epochs = []
@@ -125,51 +115,26 @@ def read_h5_files(datafilter, datatype, config_path):
                     epochs = list(np.unique(np.concatenate(epochs)))
                     # epochs = list(set([i for x in epochs for i in x]))
                     df = df.query('epoch==@epochs')
+                    
+                if 'ntrode' in df.reset_index().columns.tolist():
+                    # if any ntrode filters can be applied to this df
+                    ntrodes = []
+                    for key,filters in datafilter.items():
+                        if key in ntrodeInfo.reset_index().columns.tolist():
+                            #if the filter key can be applied to ntrodeInfo
+                            for filt in filters:
+                            #for each filter condition
+                                ntrodes.append(ntrodeInfo.reset_index().query(filt).tetrode_number.unique())
+                    print(ntrodes)
+                    ntrodes = list(np.unique(np.concatenate(ntrodes)))
+                    print(ntrodes)
+                    df = df.query('ntrode==@ntrodes')
+                
                 an_df_list.append(df)
             out.append(pd.concat(an_df_list))
         out = pd.concat(out)
     return out
 
-                
-                
-#         animals = datafilter['animals_days'].keys()
-#         days = datafilter['animals_days'].keys()
-#         taskInfo = read_h5_files(datafilter, datatype='taskInfo')
-#         ntrodeInfo = read_h5_files(datafilter, datatype='ntrodeInfo')
-        
-#         taskInfo_cols = taskInfo.columns.tolist()
-#         taskInfo_index = taskInfo.index.names
-        
-#         for key,filters in datafilter.items()
-#             if key in taskInfo_cols:
-#                 epochs = []
-#                 for filt in filters:
-#                     epochs.append(set(taskInfo.reset_index().query(filt).epoch))
-#             where = 'epoch == @epochs'
-            
-#         out = []
-#         anim_paths = get_h5_paths(animal_day_keys, config_path)        
-#         for animal, paths in anim_paths.items():
-#             an_df_list = []
-#             paths.sort()
-#             for path in paths:
-#                 an_df_list.append(pd.read_hdf(path, f'/{datatype}', where='epoch == @epochs'))
-#             out.append(pd.concat(an_df_list))
-#         out = pd.concat(out)
-        
-#     elif datatype in ['spikes', 'lfp']:
-#         ntrodeInfo = read_h5_files(datafilter, datatype='ntrodeInfo')
-#         taskInfo = read_h5_files(datafilter, datatype='taskInfo')
-#         ntrodeInfo_cols = ntrodeInfo.reset_index().columns.tolist()
-#         taskInfo_cols = ntrodeInfo.reset_index().columns.tolist()
-#         for key,filters in datafilter.items()
-#             if key in ['animals_days', 'data_types']:
-#                 continue
-#             if key in ntrodeInfo_cols:
-#                 ntrodes = []
-#                 for filt in filters:
-#                     ntrodes.append(set(ntrodeInfo.reset_index().query(filt).tetrode_number))
-#     return out
 def load_data(datafilter, datatypes=[], config_path='../config.json', source='h5'):
     if not datatypes:
         datatypes = datafilter['datatypes']
