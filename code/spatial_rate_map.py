@@ -3,8 +3,13 @@ import pandas as pd
 import numpy as np
 ### pyphy imports
 import merging
+import warnings
 
-def calc_spatial_firing_rate_maps(spikes, position, blur=9, pos_fs=30):
+warnings.filterwarnings("ignore", message="invalid value encountered in greater_equal")
+
+def calc_spatial_firing_rate_maps(data, blur=9, pos_fs=30):
+    spikes = data['spikes']
+    position = data['position']
     
     spikes_w_position = merging.get_position_of_spikes(position, spikes)
     
