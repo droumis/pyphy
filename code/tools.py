@@ -3,6 +3,8 @@ import pandas as pd
 import numpy as np
 from collections import defaultdict
 from mountainlab_pytools import mdaio
+import loren_frank_data_processing as lfdp
+
 
 import download
 
@@ -11,6 +13,33 @@ def get_computer_name(verbose=False):
     if verbose:
         print(f'computer: {computer}')
     return computer
+
+def make_animal_config(animal, animal_preprocessing_path):
+    _dates = os.listdir(animal_preprocessing_path)
+    _dates.sort()
+    _days = np.arange(1,len(_dates)+1)
+
+    _update = {}
+    _update[animal] = {}
+    _update[animal]['day2date'] = {}
+    for dt, dy in zip(_dates, _days):
+        _update[animal].update({str(dt): {'day':str(dy)}})
+        _update[animal]['day2date'][str(dy)] = str(dt)
+    
+    return _update
+
+
+def update_animal_config(animal, animal_preprocessing_path, config_path):
+    config = read_config(config_path)
+    if animal not in config['animals']:
+        config['animals'].append(animal)
+    update = make_animal_config(animal, animal_preprocessing_path)
+    config.update(update)
+    print(f'updating config for {animal}')
+    write_config(config, config_path)
+    return
+
+
 
 def read_config(config_path):
     with open(config_path, 'r') as configf:
@@ -98,7 +127,7 @@ def get_h5_paths(animal_day_keys, config_path):
     config = read_config(config_path)
     for animal, days in animal_day_keys.items():
         h5_files[animal] = []
-        if not days:
+        if days == []:
             # if empty grab all days
             days = config[animal]['day2date'].keys()
         for day in days:
@@ -119,7 +148,7 @@ def read_h5_files(datafilter, datatype, config_path):
             an_df_list = []
             paths.sort()
             for path in paths:
-                print(path)
+#                 print(path)
                 store = pd.HDFStore(path, 'r')
                 a = store.select(datatype)
 #                 a = pd.read_hdf(path, f'/{datatype}')
@@ -140,8 +169,12 @@ def read_h5_files(datafilter, datatype, config_path):
 #                 df = pd.read_hdf(path, f'/{datatype}')
 
                 # get fields of data before loading it in
-                store = pd.HDFStore(path, 'r')
-                dtstore_cols = store.select(datatype, start=1, stop=2).reset_index().columns.tolist()
+                try:
+                    store = pd.HDFStore(path, 'r')
+                    dtstore_cols = store.select(datatype, start=1, stop=2).reset_index().columns.tolist()
+                except:
+                    print(f'No object named {datatype} in {path}')
+                    continue
                 whereterms = []
 
                 if 'epoch' in dtstore_cols:
@@ -166,7 +199,7 @@ def read_h5_files(datafilter, datatype, config_path):
                             #if the filter key can be applied to ntrodeInfo
                             for filt in filters:
                             #for each filter condition
-                                ntrodes.append(ntrodeInfo.reset_index().query(filt).tetrode_number.unique())
+                                ntrodes.append(ntrodeInfo.reset_index().query(filt).ntrode.unique())
 #                     print(ntrodes)
                     ntrodes = list(np.unique(np.concatenate(ntrodes)))
 #                     print(ntrodes)
@@ -187,11 +220,15 @@ def load_data(datafilter, datatypes=[], config_path='../config.json', source='h5
             df[datatype] = read_h5_files(datafilter, datatype, config_path)
     return df
 
-### writing to pyphy h5 aka hyphy format
+### writing pandas df to pyphy format
 
-def save_df_to_hyphy(df, data_key, config_path):
+def save_df_to_pyphy(df, data_key, config_path, mode='a'):
     
     config = read_config(config_path)
+    if 'tetrode_number' in df.index.names:
+        print('changing tetrode_number to ntrode')
+        df.index.rename('ntrode', level='tetrode_number', inplace=True)
+
     
     if data_key in ['ntrodeInfo', 'taskInfo']:
         data_cols = df.iloc[[0]].reset_index().columns.tolist()
@@ -207,12 +244,46 @@ def save_df_to_hyphy(df, data_key, config_path):
         for day, df in an_df.groupby('day'):
             date = config[animal]['day2date'][str(day)]
             h5_file = os.path.join(data_dir, f'{date}_{animal}.h5')
-            with pd.HDFStore(h5_file) as f:
+            with pd.HDFStore(h5_file, mode) as f:
                 print(f'saving {data_key} to {h5_file}')
-                f.put(data_key, df, append=True, format='table', data_columns=data_cols)
+                del f[data_key]
+                f.put(data_key, df, format='table', data_columns=data_cols)
+
     return
 
+#### Filter Framework utils
 
+
+def load_from_filterframework(animal, datatype, filterframework_dir, epoch_keys=[], ntrode_keys=[]):
+    animal_dict = {}
+    animal_dict[animal] = lfdp.Animal(directory=filterframework_dir, short_name=animal)
+    
+    if datatype == 'ntrodeInfo':
+        out = lfdp.make_tetrode_dataframe(animal_dict)
+        out['subarea'] = out['subarea'].astype(str)
+        
+    elif datatype == 'taskInfo':
+        out = lfdp.make_epochs_dataframe(animal_dict)
+        
+    elif datatype == 'position':
+        if epoch_keys == []:
+            print('ntrode_keys requred')
+            return
+        position_dict_df = {}
+        for (animal, day, epoch) in epoch_keys:
+            epoch_index = (animal, day, epoch)
+            position_dict_df[(animal, day, epoch)] = lfdp.position._get_pos_dataframe(epoch_index, animal_dict)
+        out = pd.concat(position_dict_df).reset_index().rename({'level_0':'animal', 'level_1':'day', 'level_2':'epoch'}, axis=1)
+        out['timedelta'] = pd.TimedeltaIndex(out['time'], unit='ns')
+        out.set_index(['animal', 'day', 'epoch', 'timedelta'], inplace=True)
+        
+    elif datatype == 'lfp':
+        if ntrode_keys == []:
+            print('ntrode_keys requred')
+            return
+        out = _load_lfp_from_filterframework(ntrode_keys, animal_dict)
+        
+    return out
 
 
 

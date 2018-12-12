@@ -2,7 +2,7 @@ import cv2
 import pandas as pd
 import numpy as np
 ### pyphy imports
-import merging
+from . import merging
 import warnings
 
 warnings.filterwarnings("ignore", message="invalid value encountered in greater_equal")
