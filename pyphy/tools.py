@@ -6,7 +6,7 @@ from mountainlab_pytools import mdaio
 import loren_frank_data_processing as lfdp
 
 
-from . import download
+from pyphy import download
 
 def get_computer_name(verbose=False):
     computer = socket.gethostname()
@@ -254,6 +254,8 @@ def save_df_to_pyphy(df, data_key, config_path, mode='a'):
 #### Filter Framework utils
 def _load_lfp_from_filterframework(ntrode_keys, animal_dict):
     print('loading lfp from ff')
+    if len(ntrode_keys)==1:
+        print(ntrode_keys)
     lfp = lfdp.get_LFPs(ntrode_keys, animal_dict)
     
     # broadcast indices from cols and reshape df to be: (an,day,ep,td):(ntrode)
@@ -266,7 +268,9 @@ def _load_lfp_from_filterframework(ntrode_keys, animal_dict):
     df = df.set_index('timedelta').stack(level=['animal', 'day', 'epoch']).reorder_levels(['animal', 'day', 'epoch', 'timedelta'])
     return df
 
-def load_from_filterframework(animal, datatype, filterframework_dir, epoch_keys=[], ntrode_keys=[]):
+def load_from_filterframework(animal, datatype, filterframework_dir, index_keys=[]):
+    if type(index_keys) != list:
+        index_keys = [index_keys,]
     animal_dict = {}
     animal_dict[animal] = lfdp.Animal(directory=filterframework_dir, short_name=animal)
     
@@ -278,11 +282,11 @@ def load_from_filterframework(animal, datatype, filterframework_dir, epoch_keys=
         out = lfdp.make_epochs_dataframe(animal_dict)
         
     elif datatype == 'position':
-        if epoch_keys == []:
-            print('ntrode_keys requred')
+        if len(index_keys[0]) != 3:
+            print('epoch_keys requred as list of (animal, day, epoch)')
             return
         position_dict_df = {}
-        for (animal, day, epoch) in epoch_keys:
+        for (animal, day, epoch) in index_keys:
             epoch_index = (animal, day, epoch)
             position_dict_df[(animal, day, epoch)] = lfdp.position._get_pos_dataframe(epoch_index, animal_dict)
         out = pd.concat(position_dict_df).reset_index().rename({'level_0':'animal', 'level_1':'day', 'level_2':'epoch'}, axis=1)
@@ -290,10 +294,10 @@ def load_from_filterframework(animal, datatype, filterframework_dir, epoch_keys=
         out.set_index(['animal', 'day', 'epoch', 'timedelta'], inplace=True)
         
     elif datatype == 'lfp':
-        if ntrode_keys == []:
-            print('ntrode_keys requred for LFP loading')
+        if len(index_keys[0]) != 4:
+            print('ntrode_keys requred as list of (animal, day, epoch, ntrode)')
             return
-        out = _load_lfp_from_filterframework(ntrode_keys, animal_dict)
+        out = _load_lfp_from_filterframework(index_keys, animal_dict)
         
     return out
 
