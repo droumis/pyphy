@@ -6,7 +6,7 @@ from mountainlab_pytools import mdaio
 import loren_frank_data_processing as lfdp
 
 
-import download
+from . import download
 
 def get_computer_name(verbose=False):
     computer = socket.gethostname()
