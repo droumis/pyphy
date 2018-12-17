@@ -1,9 +1,11 @@
 import cv2
 import pandas as pd
 import numpy as np
-### pyphy imports
-from . import merging
 import warnings
+
+### pyphy imports
+import merging
+
 
 warnings.filterwarnings("ignore", message="invalid value encountered in greater_equal")
 

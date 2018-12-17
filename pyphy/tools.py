@@ -232,7 +232,7 @@ def save_df_to_pyphy(df, data_key, config_path, mode='a'):
     
     if data_key in ['ntrodeInfo', 'taskInfo']:
         data_cols = df.iloc[[0]].reset_index().columns.tolist()
-    elif data_key in ['position', 'dio', 'timeFilters', 'lfp_wide', 'lfp_ripple', 'lfp_theta',]:
+    elif data_key in ['position', 'dio', 'timeFilters', 'lfp', 'lfp_ripple', 'lfp_theta',]:
         data_cols = ['animal', 'day', 'epoch', 'timedelta'] 
     elif data_key in ['spikes', 'clips', 'marks']:
         data_cols = ['animal', 'day', 'epoch', 'ntrode', 'timedelta']
@@ -246,13 +246,25 @@ def save_df_to_pyphy(df, data_key, config_path, mode='a'):
             h5_file = os.path.join(data_dir, f'{date}_{animal}.h5')
             with pd.HDFStore(h5_file, mode) as f:
                 print(f'saving {data_key} to {h5_file}')
-                del f[data_key]
+#                 del f[data_key]
                 f.put(data_key, df, format='table', data_columns=data_cols)
 
     return
 
 #### Filter Framework utils
+def _load_lfp_from_filterframework(ntrode_keys, animal_dict):
+    print('loading lfp from ff')
+    lfp = lfdp.get_LFPs(ntrode_keys, animal_dict)
+    
+    # broadcast indices from cols and reshape df to be: (an,day,ep,td):(ntrode)
 
+    lfp_mi_list = [(str(a), int(d), int(e), int(n)) for col in lfp.columns.tolist() for (a, d, e, n) in [col.split('_')]]
+    lfp_mi = pd.MultiIndex.from_tuples(lfp_mi_list, names=['animal', 'day', 'epoch', 'ntrode'])
+
+    df = pd.DataFrame(lfp.T.values, index=lfp_mi).T #grab lfp values to avoid index merging
+    df['timedelta'] = lfp.index
+    df = df.set_index('timedelta').stack(level=['animal', 'day', 'epoch']).reorder_levels(['animal', 'day', 'epoch', 'timedelta'])
+    return df
 
 def load_from_filterframework(animal, datatype, filterframework_dir, epoch_keys=[], ntrode_keys=[]):
     animal_dict = {}
@@ -279,7 +291,7 @@ def load_from_filterframework(animal, datatype, filterframework_dir, epoch_keys=
         
     elif datatype == 'lfp':
         if ntrode_keys == []:
-            print('ntrode_keys requred')
+            print('ntrode_keys requred for LFP loading')
             return
         out = _load_lfp_from_filterframework(ntrode_keys, animal_dict)
         
