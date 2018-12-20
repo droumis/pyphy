@@ -4,6 +4,7 @@ import numpy as np
 from collections import defaultdict
 from mountainlab_pytools import mdaio
 import loren_frank_data_processing as lfdp
+from scipy.io import loadmat
 
 
 from pyphy import download
@@ -170,42 +171,52 @@ def read_h5_files(datafilter, datatype, config_path):
 
                 # get fields of data before loading it in
                 try:
-                    store = pd.HDFStore(path, 'r')
-                    dtstore_cols = store.select(datatype, start=1, stop=2).reset_index().columns.tolist()
+                    with pd.HDFStore(path, 'r') as store:
+                        dtstore_cols = store.select(datatype, start=1, stop=2).reset_index().columns.tolist()
+#                     print(dtstore_cols)
                 except:
                     print(f'No object named {datatype} in {path}')
                     continue
                 whereterms = []
-
+                epochs = []
+                ntrodes = []
                 if 'epoch' in dtstore_cols:
                     # if any epoch filters can be applied to this df
-                    epochs = []
                     for key,filters in datafilter.items():
                         if key in taskInfo.reset_index().columns.tolist():
                             #if the filter key can be applied to taskInfo
                             for filt in filters:
                             #for each filter condition
                                 epochs.append(taskInfo.reset_index().query(filt).epoch.unique())
-                    epochs = list(np.unique(np.concatenate(epochs)))
+                    if epochs != []:
+                        epochs = list(np.unique(np.concatenate(epochs)))
                     # epochs = list(set([i for x in epochs for i in x]))
-                    whereterms.append('epoch == epochs') # '==' also functions as 'is in'. hdfstore query format is different than native pandas
+                        whereterms.append('epoch == epochs') # '==' also functions as 'is in'. hdfstore query format is different than native pandas
 #                     df = df.query('epoch==@epochs')
             
                 if 'ntrode' in dtstore_cols:
+                    
                     # if any ntrode filters can be applied to this df
-                    ntrodes = []
                     for key,filters in datafilter.items():
                         if key in ntrodeInfo.reset_index().columns.tolist():
                             #if the filter key can be applied to ntrodeInfo
                             for filt in filters:
                             #for each filter condition
                                 ntrodes.append(ntrodeInfo.reset_index().query(filt).ntrode.unique())
-#                     print(ntrodes)
-                    ntrodes = list(np.unique(np.concatenate(ntrodes)))
-#                     print(ntrodes)
-                    whereterms.append('ntrode == ntrodes') # '==' also functions as 'is in'. hdfstore query format is different than native pandas
+                    if ntrodes != []:
+                        ntrodes = list(np.unique(np.concatenate(ntrodes)))
+                        whereterms.append('ntrode == ntrodes') # '==' also functions as 'is in'. hdfstore query format is different than native pandas
 #                     df = df.query('ntrode==@ntrodes')
-                an_df_list.append(store.select(datatype, where=whereterms))
+                if whereterms != []:
+                    print(f'loading {datatype} where {whereterms}')
+    #                 import pdb; pdb.set_trace()
+                    with pd.HDFStore(path, 'r') as store:
+                        an_df_list.append(store.select(datatype, where=whereterms))
+                else:
+                    print(f'loading {datatype}')
+    #                 import pdb; pdb.set_trace()
+                    with pd.HDFStore(path, 'r') as store:
+                        an_df_list.append(store.select(datatype))
             out.append(pd.concat(an_df_list)) #concat across days each animal
 #             out.append(an_df_list)
         out = pd.concat(out) #concat across animals
@@ -254,8 +265,7 @@ def save_df_to_pyphy(df, data_key, config_path, mode='a'):
 #### Filter Framework utils
 def _load_lfp_from_filterframework(ntrode_keys, animal_dict):
     print('loading lfp from ff')
-    if len(ntrode_keys)==1:
-        print(ntrode_keys)
+    print(ntrode_keys)
     lfp = lfdp.get_LFPs(ntrode_keys, animal_dict)
     
     # broadcast indices from cols and reshape df to be: (an,day,ep,td):(ntrode)
@@ -266,6 +276,34 @@ def _load_lfp_from_filterframework(ntrode_keys, animal_dict):
     df = pd.DataFrame(lfp.T.values, index=lfp_mi).T #grab lfp values to avoid index merging
     df['timedelta'] = lfp.index
     df = df.set_index('timedelta').stack(level=['animal', 'day', 'epoch']).reorder_levels(['animal', 'day', 'epoch', 'timedelta'])
+    return df
+
+def _get_linearcoord_tasksegments(df, animal_dict):
+    track_segments = {}
+    linearcoord_arms = {}
+    center_well_position = {}
+    animals_days_iter = df.reset_index().groupby(['animal', 'day'])
+    for (animal, day), _ in animals_days_iter:
+#         print(animal, day)
+        file_name = os.path.join(animal_dict[animal].directory, f'{animal}task{day:0>2d}.mat')
+#         print(file_name)
+        data = loadmat(file_name, variable_names=('task'))['task']
+        day = data.shape[-1]
+        epochs = data[0, -1][0]
+        for i, epoch_data in enumerate(epochs):
+            epoch = i+1
+            if 'linearcoord' in epoch_data.dtype.names:
+                linearcoord = epoch_data[0]['linearcoord'].item().squeeze()
+                linearcoord_arms[(animal, day, epoch)] = [np.round(arm[:, :, 0], decimals=2) for arm in linearcoord]
+                track_segments[(animal, day, epoch)] = [np.round(np.stack(((arm[:-1, :, 0], arm[1:, :, 0])), axis=1), decimals=2)
+                                  for arm in linearcoord]
+                center_well_position[(animal, day, epoch)] = track_segments[(animal, day, epoch)][0][0][0]
+                track_segments[(animal, day, epoch)] = np.concatenate(track_segments[(animal, day, epoch)])
+                _, unique_ind = np.unique(track_segments[(animal, day, epoch)], return_index=True, axis=0)
+                track_segments[(animal, day, epoch)] = [track_segments[(animal, day, epoch)][ind] for ind in unique_ind]
+    df['linearcoord'] = df.index.map(linearcoord_arms)
+    df['track_segments'] = df.index.map(track_segments)
+    df['center_well_position'] = df.index.map(center_well_position)
     return df
 
 def load_from_filterframework(animal, datatype, filterframework_dir, index_keys=[]):
@@ -280,6 +318,10 @@ def load_from_filterframework(animal, datatype, filterframework_dir, index_keys=
         
     elif datatype == 'taskInfo':
         out = lfdp.make_epochs_dataframe(animal_dict)
+    
+    elif datatype == 'linearcoord' or datatype == 'task_segments':
+        out = lfdp.make_epochs_dataframe(animal_dict)
+        out = _get_linearcoord_tasksegments(out, animal_dict)
         
     elif datatype == 'position':
         if len(index_keys[0]) != 3:
@@ -288,10 +330,11 @@ def load_from_filterframework(animal, datatype, filterframework_dir, index_keys=
         position_dict_df = {}
         for (animal, day, epoch) in index_keys:
             epoch_index = (animal, day, epoch)
-            position_dict_df[(animal, day, epoch)] = lfdp.position._get_pos_dataframe(epoch_index, animal_dict)
+            position_dict_df[(animal, day, epoch)] = lfdp.get_position_dataframe(epoch_index, animal_dict)
         out = pd.concat(position_dict_df).reset_index().rename({'level_0':'animal', 'level_1':'day', 'level_2':'epoch'}, axis=1)
         out['timedelta'] = pd.TimedeltaIndex(out['time'], unit='ns')
         out.set_index(['animal', 'day', 'epoch', 'timedelta'], inplace=True)
+        out['is_correct'] = out.is_correct.astype('float')
         
     elif datatype == 'lfp':
         if len(index_keys[0]) != 4:
@@ -368,7 +411,9 @@ def get_spikes_from_mda(animal, dates, ntrodes, mda_preproc_dir, ms_firings_dir,
     
     if dates == []:
         dates = config[animal]['day2date'].values()
-        
+    elif type(dates) is str or type(dates) is int:
+        dates = [str(dates),]
+
     spikes_df = defaultdict(lambda: defaultdict(dict))
     
     for date in dates:
