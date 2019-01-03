@@ -10,7 +10,7 @@ import ms4_franklab_pyplines as pyp
 from mountainlab_pytools import mdaio
 
 ### pyphy imports
-from . import tools
+from pyphy import core
 
 
 def get_mda_list(anim, date, ntrode, data_location):
@@ -98,7 +98,7 @@ def load_firings(firings_path, samples_offset, ep_samp_start_offset, animal, dat
     spikes_df['primary_chan'] = firings[0,:].astype(int)
     #add animal, day, epoch cols:
     spikes_df['animal'] = animal
-    spikes_df['day'] = tools.convert_dates_to_days(animal, date, config_path)
+    spikes_df['day'] = core.convert_dates_to_days(animal, date, config_path)
     spikes_df['ntrode'] = ntrode
     spikes_df['epoch'] = 0
     ep_samp_start_timedelta = pd.TimedeltaIndex([ep_s/fs  for ep_s in \
@@ -143,7 +143,7 @@ def load_metrics(metrics_path, animal, date, ntrode, config_path):
         di[cmetrics['cluster']] = cmetrics
     metrics_df = pd.DataFrame.from_dict(di,orient='index')
     metrics_df['animal'] = animal
-    metrics_df['day'] = tools.convert_dates_to_days(animal, date, config_path)
+    metrics_df['day'] = core.convert_dates_to_days(animal, date, config_path)
     metrics_df['ntrode'] = ntrode
     return metrics_df.set_index(['animal', 'day', 'ntrode', 'cluster'])
 

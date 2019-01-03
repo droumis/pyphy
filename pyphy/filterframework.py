@@ -95,5 +95,9 @@ def load_from_filterframework(animal, datatype, filterframework_dir, index_keys=
             return
         out = _load_lfp_from_filterframework(index_keys, animal_dict)
         
+    if 'tetrode_number' in out.index.names:
+        print('renaming "tetrode_number" to "ntrode" in multiindex')
+        out.index.rename('ntrode', level='tetrode_number', inplace=True)
+
     return out
 

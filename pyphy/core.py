@@ -1,3 +1,4 @@
+#standard lib imports
 import h5py, socket, json, glob, os
 import pandas as pd
 import numpy as np
@@ -5,8 +6,10 @@ from collections import defaultdict
 import loren_frank_data_processing as lfdp
 from scipy.io import loadmat
 
-
+### pyphy imports
+from pyphy import exceptions
 from pyphy import download
+from pyphy import filterframework
 
 def get_computer_name(verbose=False):
     computer = socket.gethostname()
@@ -136,43 +139,34 @@ def get_h5_paths(animal_day_keys, config_path):
         h5_files[animal].sort()
     return h5_files
 
-def read_h5_files(datafilter, datatype, config_path):
-    animal_day_keys = datafilter['animals_days']
-    anim_paths = get_h5_paths(animal_day_keys, config_path)      
-#     print(anim_paths)
+def read_h5_files(animals_days, datatype, config_path, **kwargs):
+
+    anim_paths = get_h5_paths(animals_days, config_path)      
     out = []
     
     if datatype in ['ntrodeInfo', 'taskInfo']:
-        # in info df, load all
         for animal, paths in anim_paths.items():
             an_df_list = []
             paths.sort()
             for path in paths:
-#                 print(path)
                 store = pd.HDFStore(path, 'r')
-                a = store.select(datatype)
-#                 a = pd.read_hdf(path, f'/{datatype}')
-                an_df_list.append(a)
+                df = store.select(datatype)
+                an_df_list.append(df)
             out.append(pd.concat(an_df_list))
         out = pd.concat(out)
 
     else:
-        taskInfo = read_h5_files(datafilter, datatype='taskInfo', config_path=config_path)
-        ntrodeInfo = read_h5_files(datafilter, datatype='ntrodeInfo', config_path=config_path)
+        taskInfo = read_h5_files(animals_days, datatype='taskInfo', config_path=config_path)
+        ntrodeInfo = read_h5_files(animals_days, datatype='ntrodeInfo', config_path=config_path)
         
-#         print(anim_paths)
         for animal, paths in anim_paths.items():
             an_df_list = []
             paths.sort()
             for path in paths:
-#                 print(path)
-#                 df = pd.read_hdf(path, f'/{datatype}')
-
-                # get fields of data before loading it in
+                # get fields of data to filter on load
                 try:
                     with pd.HDFStore(path, 'r') as store:
                         dtstore_cols = store.select(datatype, start=1, stop=2).reset_index().columns.tolist()
-#                     print(dtstore_cols)
                 except:
                     print(f'No object named {datatype} in {path}')
                     continue
@@ -181,7 +175,7 @@ def read_h5_files(datafilter, datatype, config_path):
                 ntrodes = []
                 if 'epoch' in dtstore_cols:
                     # if any epoch filters can be applied to this df
-                    for key,filters in datafilter.items():
+                    for key,filters in kwargs.items():
                         if key in taskInfo.reset_index().columns.tolist():
                             #if the filter key can be applied to taskInfo
                             for filt in filters:
@@ -189,14 +183,11 @@ def read_h5_files(datafilter, datatype, config_path):
                                 epochs.append(taskInfo.reset_index().query(filt).epoch.unique())
                     if epochs != []:
                         epochs = list(np.unique(np.concatenate(epochs)))
-                    # epochs = list(set([i for x in epochs for i in x]))
-                        whereterms.append('epoch == epochs') # '==' also functions as 'is in'. hdfstore query format is different than native pandas
-#                     df = df.query('epoch==@epochs')
+                        whereterms.append('epoch == epochs') # '==' also functions as 'is in'. hdfstore query format is different than standard pandas hdf reading
             
                 if 'ntrode' in dtstore_cols:
-                    
                     # if any ntrode filters can be applied to this df
-                    for key,filters in datafilter.items():
+                    for key,filters in kwargs.items():
                         if key in ntrodeInfo.reset_index().columns.tolist():
                             #if the filter key can be applied to ntrodeInfo
                             for filt in filters:
@@ -204,30 +195,43 @@ def read_h5_files(datafilter, datatype, config_path):
                                 ntrodes.append(ntrodeInfo.reset_index().query(filt).ntrode.unique())
                     if ntrodes != []:
                         ntrodes = list(np.unique(np.concatenate(ntrodes)))
-                        whereterms.append('ntrode == ntrodes') # '==' also functions as 'is in'. hdfstore query format is different than native pandas
-#                     df = df.query('ntrode==@ntrodes')
+                        whereterms.append('ntrode == ntrodes')
                 if whereterms != []:
                     print(f'loading {datatype} where {whereterms}')
-    #                 import pdb; pdb.set_trace()
                     with pd.HDFStore(path, 'r') as store:
                         an_df_list.append(store.select(datatype, where=whereterms))
-                else:
+                else: #load errthing
                     print(f'loading {datatype}')
-    #                 import pdb; pdb.set_trace()
                     with pd.HDFStore(path, 'r') as store:
                         an_df_list.append(store.select(datatype))
             out.append(pd.concat(an_df_list)) #concat across days each animal
-#             out.append(an_df_list)
         out = pd.concat(out) #concat across animals
     return out
 
-def load_data(datafilter, datatypes=[], config_path='../config.json', source='h5'):
-    if not datatypes:
-        datatypes = datafilter['datatypes']
+def load_data(datatypes=[], source='pyphy', **kwargs):
+
     df = {}
     for datatype in datatypes:
-        if source == 'h5':
-            df[datatype] = read_h5_files(datafilter, datatype, config_path)
+        if source=='h5' or source=='pyphy':
+            include_kwargs = ['config_path','animals_days']
+            if set(include_kwargs).issubset(kwargs):
+                animals_days = kwargs['animals_days']
+                config_path = kwargs['config_path']
+                [kwargs.pop(k, None) for k in include_kwargs]
+                df[datatype] = read_h5_files(animals_days,datatype,config_path,**kwargs)
+            else:
+                raise TypeError(f'missing kwargs {list(include_kwargs - kwargs.keys())} for source "{source}"')
+        elif source=='ff' or source=='filterframework':
+            include_kwargs = ['index_keys', 'animal', 'filterframework_dir']
+            if set(include_kwargs).issubset(kwargs):
+                df[datatype] = filterframework.load_from_filterframework(
+                    kwargs['animal'], datatype,
+                    kwargs['filterframework_dir'],
+                    index_keys=kwargs['index_keys'])
+            else:
+                raise TypeError(f'missing kwargs {list(include_kwargs - kwargs.keys())} for source "{source}"')
+        else:
+            raise ValueError(f'invalid data source {source}')
     return df
 
 ### writing pandas df to pyphy format
