@@ -195,12 +195,14 @@ def get_spikes_from_mda(animal, dates, ntrodes, mda_preproc_dir, ms_firings_dir,
 
 
 
-def run_sort(animal, dates, ntrodes, input_path, output_path, curation_args,
+def run_sort(ntrodes=[], animal='', dates=[], input_path='', output_path='', curation_args={},
              extract_marks=True, extract_clips=True, clip_size=100, freq_min=600,
              freq_max=6000, adjacency_radius=-1, detect_threshold=3, detect_sign=-1):
     
     if type(ntrodes) is not list:
         ntrodes = [ntrodes,]
+    if type(dates) is not list:
+        dates = [dates,]
         
     for date in dates:
         print(f'running {animal} date:{date} ntrodes:{ntrodes}')
