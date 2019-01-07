@@ -1,12 +1,13 @@
-import h5py, socket, json, glob, os, sys
+import h5py, socket, json, glob, os, sys, datetime, multiprocessing
 import pandas as pd
 import numpy as np
 from collections import defaultdict
+from functools import partial
+from contextlib import contextmanager
 
 ### ms4 imports
 sys.path.append('/home/droumis/Src/franklab_ms4/')
 import ms4_franklab_pyplines as pyp
-
 from mountainlab_pytools import mdaio
 
 ### pyphy imports
@@ -195,7 +196,7 @@ def get_spikes_from_mda(animal, dates, ntrodes, mda_preproc_dir, ms_firings_dir,
 
 
 
-def run_sort(ntrodes=[], animal='', dates=[], input_path='', output_path='', curation_args={},
+def _run_sort(ntrodes=[], animal='', dates=[], input_path='', output_path='', curation_args={},
              extract_marks=True, extract_clips=True, clip_size=100, freq_min=600,
              freq_max=6000, adjacency_radius=-1, detect_threshold=3, detect_sign=-1):
     
@@ -254,3 +255,30 @@ def run_sort(ntrodes=[], animal='', dates=[], input_path='', output_path='', cur
                 
             # ntr_end_time.append(datetime.datetime.now())
     return
+
+ 
+@contextmanager
+def poolcontext(*args, **kwargs):
+    pool = multiprocessing.Pool(*args, **kwargs)
+    yield pool
+    pool.terminate()
+    
+def run_sort(animal='', dates=[], ntrodes=[], input_path='', output_path='', curation_args='', 
+             freq_min=600, n_processes=8, multiprocessing=True):
+    start_time = datetime.datetime.now()
+    if multiprocessing:
+        with poolcontext(processes=n_processes) as pool:
+            pool.map(partial(_run_sort, animal=animal, dates=dates,
+                                 input_path=input_path, output_path=output_path, 
+                                 curation_args=curation_args, freq_min=freq_min), ntrodes)
+            pool.close()
+            pool.join()
+    else:
+        _run_sort(ntrodes=ntrodes, animal=animal, dates=dates,
+                                 input_path=input_path, output_path=output_path, 
+                                 curation_args=curation_args, freq_min=freq_min)
+
+    end_time = datetime.datetime.now()
+    duration = end_time-start_time
+    print('total time:', duration.seconds/60/60, 'hours')
+    return duration
