@@ -1,6 +1,7 @@
 # pyphy
 
-pyphy is a python-based analysis framework for physiological data
+pyphy is a python-based analysis framework for physiological data.  
+It is experimental and subject to change without notice.
 
 ## Install
 `conda update conda`  
